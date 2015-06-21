@@ -1,0 +1,82 @@
+
+---
+title: "Practical Machine Learning - Writeup"
+---
+
+Loading the given data
+
+```{r, cache=TRUE}
+library(ggplot2)
+library(caret)
+library(randomForest)
+train_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+test_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+train_file <- file.path(getwd(), "pml-training.csv")
+test_file <- file.path(getwd(), "pml-testing.csv")
+
+if (file.exists("pml-training.csv")) {
+  trainDT <- read.csv(train_file,na.strings=c("NA",""))
+}else {
+  download.file(train_url, train_file, method = "curl")
+  trainDT <- read.csv(train_file,na.strings=c("NA",""))
+}
+
+if (file.exists("pml-testing.csv")) {
+  testDT <- read.csv(test_file,na.strings=c("NA",""))
+}else {
+  download.file(test_url, test_file, method = "curl")
+  testDT <- read.csv(test_file,na.strings=c("NA",""))
+}
+
+
+```
+
+The original training data has 19622 rows and 160 columns.
+
+Cleaning Data
+
+The training data as below has been cleaned for unwated columns like timestamp, user_name, etc. The NA's have all been removed . The resulting dataset has 19622 rows and 53 colums for analysis. 
+
+```{r, cache=TRUE}
+
+NAs <- apply(trainDT, 2, function(x) { sum(is.na(x)) })
+trainValidDT <- trainDT[, which(NAs == 0)]
+#unwanted columns are being removed
+removeIndex <- grep("timestamp|X|user_name|new_window|num_window", names(trainValidDT))
+trainValidDT <- trainValidDT[, -removeIndex]
+```
+
+
+With the large size of the data set, I believe Random Forest model would achieve higher accuracy compared to other models. Also, since the below function trains the model with cross validation we do not lose data for validation set. I chose to do 5 fold cross validation.
+
+```{r trainc, cache=TRUE}
+tc = trainControl(method = "cv", number = 5)
+```
+
+```{r modfit, cache=TRUE, cache.lazy=FALSE}
+modFit <- train(trainValidDT$classe ~., data = trainValidDT,method="rf", trControl = tc,prox = TRUE,allowParallel = TRUE)                 
+```
+
+
+```{r modDisp, cache=TRUE}
+modFit$finalModel
+```
+Based on the output,we can see that the Out of sample error is predicted to be 0.43%.
+
+
+**TEST DATA**
+Cleaning the data similar to the training Set 
+
+```{r, cache=TRUE}
+NAstest <- apply(testDT, 2, function(x) { sum(is.na(x)) })
+testValidDT <- testDT[, which(NAstest == 0)]
+#unwanted columns are being removed
+removeIndextest <- grep("timestamp|X|user_name|new_window|num_window", names(testValidDT))
+testValidDT <- testValidDT[, -removeIndextest]
+```
+
+Test Data Prediction
+```{r, cache=TRUE}
+predTest <- predict(modFit, newdata=testValidDT)
+```
